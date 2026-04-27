@@ -947,8 +947,10 @@ function initNavbarTheme() {
   const triggerLine1 = document.querySelector('.nav_mobile-trigger_line1');
   const triggerLine2 = document.querySelector('.nav_mobile-trigger_line2');
   if (!navbar || !triggerLine1 || !triggerLine2) return; // prevent crash
+
   let currentTheme = null;
   const OFFSET = 40;
+
   function getSectionAtTop() {
     const themeSections = document.querySelectorAll('[data-theme]');
     for (const section of themeSections) {
@@ -961,9 +963,11 @@ function initNavbarTheme() {
     }
     return null;
   }
-  function updateNavbarTheme() {
+
+  window.updateNavbarTheme = function() {
     const topSection = getSectionAtTop();
     if (!topSection) return;
+
     const theme = topSection.getAttribute('data-theme');
     if (theme !== currentTheme) {
       currentTheme = theme;
@@ -971,13 +975,13 @@ function initNavbarTheme() {
       if (theme === 'light') {
         navbar.style.backgroundColor = 'var(--background--light)';
         navbar.style.color = 'var(--text-color--primary-dark)';
-        triggerLine1.style.backgroundColor = 'var(--background--dark)';
-        triggerLine2.style.backgroundColor = 'var(--background--dark)';
+        triggerLine1.style.backgroundColor = 'var(--text-color--primary-dark)';
+        triggerLine2.style.backgroundColor = 'var(--text-color--primary-dark)';
       } else if (theme === 'dark') {
         navbar.style.backgroundColor = 'var(--background--dark)';
         navbar.style.color = 'var(--text-color--primary-light)';
-        triggerLine1.style.backgroundColor = 'var(--background--light)';
-        triggerLine2.style.backgroundColor = 'var(--background--light)';
+        triggerLine1.style.backgroundColor = 'var(--text-color--primary-light)';
+        triggerLine2.style.backgroundColor = 'var(--text-color--primary-light)';
       } else if (theme === 'transparent') {
         navbar.style.backgroundColor = 'transparent';
         navbar.style.color = 'var(--text-color--primary-light)';
@@ -986,10 +990,22 @@ function initNavbarTheme() {
       }
     }
   }
-  updateNavbarTheme();
-  window.addEventListener('scroll', () => {
-    requestAnimationFrame(updateNavbarTheme);
-  });
+
+  window.updateNavbarTheme();
+
+  if (!window._navbarScrollAttached) {
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (window.updateNavbarTheme) window.updateNavbarTheme();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+    window._navbarScrollAttached = true;
+  }
 }
 function initMobileMenu() {
   const trigger = document.querySelector(".nav_mobile-trigger");
@@ -1092,263 +1108,292 @@ function initDesktopServiceMenu() {
           <!--  BARBAJS TRANSITION  -->
           <script src="https://unpkg.com/@barba/core" defer=""></script>
           <script>
-document.addEventListener("DOMContentLoaded", () => {
-console.log('[Barba] Script loaded');
-// Prevent browser from auto-restoring scroll position
-window.history.scrollRestoration = 'manual';
-// Simple scroll lock functions
-function lockScroll() {
-  // Disable Lenis if it exists
-  if (window.lenis) {
-    window.lenis.stop();
+  console.log('[Barba] Script loaded');
+  // Prevent browser from auto-restoring scroll position
+  window.history.scrollRestoration = 'manual';
+
+  // Simple scroll lock functions
+  function lockScroll() {
+    // Disable Lenis if it exists
+    if (window.lenis) {
+      window.lenis.stop();
+    }
+    // Prevent scroll events
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKeys, { passive: false });
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
   }
-  // Prevent scroll events
-  document.addEventListener('wheel', preventScroll, { passive: false });
-  document.addEventListener('touchmove', preventScroll, { passive: false });
-  document.addEventListener('keydown', preventScrollKeys, { passive: false });
-  // Lock body scroll
-  document.body.style.overflow = 'hidden';
-  document.documentElement.style.overflow = 'hidden';
-}
-function unlockScroll() {
-  // Re-enable Lenis if it exists
-  if (window.lenis) {
-    window.lenis.start();
+
+  function unlockScroll() {
+    // Re-enable Lenis if it exists
+    if (window.lenis) {
+      window.lenis.start();
+    }
+    // Remove event listeners
+    document.removeEventListener('wheel', preventScroll);
+    document.removeEventListener('touchmove', preventScroll);
+    document.removeEventListener('keydown', preventScrollKeys);
+    // Unlock body scroll
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
   }
-  // Remove event listeners
-  document.removeEventListener('wheel', preventScroll);
-  document.removeEventListener('touchmove', preventScroll);
-  document.removeEventListener('keydown', preventScrollKeys);
-  // Unlock body scroll
-  document.body.style.overflow = '';
-  document.documentElement.style.overflow = '';
-}
-function preventScroll(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  return false;
-}
-function preventScrollKeys(e) {
-  const keys = [32, 33, 34, 35, 36, 37, 38, 39, 40]; // space, page up/down, end, home, arrow keys
-  if (keys.includes(e.keyCode)) {
+
+  function preventScroll(e) {
     e.preventDefault();
+    e.stopPropagation();
     return false;
   }
-}
-barba.init({
-  debug: true,
-  scroll: false,
-  transitions: [
-    {
-      name: 'works-to-detail',
-      from: { namespace: ['works'] },
-      to: { namespace: ['work-detail'] },
-      // Only apply this transition to elements with data-image-id
-      custom: ({ trigger }) => {
-        return trigger && trigger.hasAttribute('data-image-id');
-      },
-      async leave(data) {
-        console.log('[Barba] leave works → detail');
-        // 🔒 LOCK SCROLL IMMEDIATELY
-        lockScroll();
-        const done = this.async();
-        const imageId = data.trigger?.dataset?.imageId;
-        const fromImage = data.current.container.querySelector(`img[data-image-id="${imageId}"]`);
-        if (!fromImage) {
-          unlockScroll(); // Unlock if no image found
-          return done();
-        }
-        // Measure position BEFORE any changes
-        const rect = fromImage.getBoundingClientRect();
-        // Clone the image
-        const clone = fromImage.cloneNode(true);
-        Object.assign(clone.style, {
-          position: 'fixed',
-          top: `${rect.top}px`,
-          left: `${rect.left}px`,
-          width: `${rect.width}px`,
-          height: `${rect.height}px`,
-          zIndex: 9999,
-          objectFit: 'cover',
-          pointerEvents: 'none',
-          margin: 0
-        });
-        document.body.appendChild(clone);
-        data.clone = clone;
-        data.imageId = imageId;
-        // Create overlay
-        const overlay = document.createElement('div');
-        Object.assign(overlay.style, {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'var(--background--light)',
-          opacity: 0,
-          zIndex: 9998,
-          pointerEvents: 'none'
-        });
-        overlay.classList.add('barba-transition-overlay');
-        document.body.appendChild(overlay);
-        data.overlay = overlay;
-        // Animate overlay fade-in
-        await gsap.to(overlay, {
-          opacity: 1,
-          duration: 0.3,
-          ease: 'power2.out'
-        });
-        // Force body background
-        document.body.style.setProperty('background-color', 'var(--background--light)', 'important');
-        // Scroll to top AFTER locking scroll
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-        // Begin fading out current container
-        data.current.container.classList.add('barba-container-transitioning');
-        await gsap.to(data.current.container, {
-          opacity: 0,
-          duration: 0.3,
-          ease: 'power2.out'
-        });
-        done();
-      },
-      async enter(data) {
-        console.log('[Barba] enter work-detail');
-        const nextContainer = data.next.container;
-        const clone = data.clone;
-        const imageId = data.imageId;
-        // Keep scroll locked during enter phase
-        if (!clone || !imageId) {
-          gsap.set(nextContainer, { opacity: 1 });
-          // 🔓 UNLOCK SCROLL
-          unlockScroll();
-          return;
-        }
-        gsap.set(nextContainer, { opacity: 0 });
-        let toImage = null;
-        for (let i = 0; i < 15; i++) {
-          await new Promise(r => setTimeout(r, 66));
-          toImage = data.next.container.querySelector(`img.is-work[data-image-id="${imageId}"]`);
-          if (toImage) break;
-        }
-        if (!toImage) {
-          clone.remove();
-          data.overlay?.remove();
-          gsap.set(nextContainer, { opacity: 1 });
-          // 🔓 UNLOCK SCROLL
-          unlockScroll();
-          return;
-        }
-        
-        // Wait for image to load to guarantee correct height
-        if (!toImage.complete) {
-          await new Promise((resolve) => {
-            toImage.addEventListener('load', resolve);
-            toImage.addEventListener('error', resolve);
-            setTimeout(resolve, 1500); // fallback timeout
+
+  function preventScrollKeys(e) {
+    const keys = [32, 33, 34, 35, 36, 37, 38, 39, 40]; // space, page up/down, end, home, arrow keys
+    if (keys.includes(e.keyCode)) {
+      e.preventDefault();
+      return false;
+    }
+  }
+
+  barba.init({
+    debug: true,
+    scroll: false,
+    transitions: [
+      {
+        name: 'works-to-detail',
+        from: { namespace: ['works'] },
+        to: { namespace: ['work-detail'] },
+        // Only apply this transition to elements with data-image-id
+        custom: ({ trigger }) => {
+          return trigger && trigger.hasAttribute('data-image-id');
+        },
+        async leave(data) {
+          console.log('[Barba] leave works -> detail');
+          // 🔒 LOCK SCROLL IMMEDIATELY
+          lockScroll();
+          const done = this.async();
+          const imageId = data.trigger?.dataset?.imageId;
+          const fromImage = data.current.container.querySelector(`img[data-image-id="${imageId}"]`);
+          
+          if (!fromImage) {
+            unlockScroll(); // Unlock if no image found
+            return done();
+          }
+
+          // Measure position BEFORE any changes
+          const rect = fromImage.getBoundingClientRect();
+          
+          // Clone the image
+          const clone = fromImage.cloneNode(true);
+          Object.assign(clone.style, {
+            position: 'fixed',
+            top: `${rect.top}px`,
+            left: `${rect.left}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            zIndex: 9999,
+            objectFit: 'cover',
+            pointerEvents: 'none',
+            margin: 0
           });
-        }
-        
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        const rect = toImage.getBoundingClientRect();
-        
-        // Final sanity check, if it's somehow completely hidden just fallback
-        if (rect.height === 0) {
+          document.body.appendChild(clone);
+          data.clone = clone;
+          data.imageId = imageId;
+
+          // Create overlay
+          const overlay = document.createElement('div');
+          Object.assign(overlay.style, {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'var(--background--light)',
+            opacity: 0,
+            zIndex: 9998,
+            pointerEvents: 'none'
+          });
+          overlay.classList.add('barba-transition-overlay');
+          document.body.appendChild(overlay);
+          data.overlay = overlay;
+
+          // Animate overlay fade-in
+          await gsap.to(overlay, {
+            opacity: 1,
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+
+          // Force body background
+          document.body.style.setProperty('background-color', 'var(--background--light)', 'important');
+          
+          // Scroll to top AFTER locking scroll
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+          // Begin fading out current container
+          data.current.container.classList.add('barba-container-transitioning');
+          await gsap.to(data.current.container, {
+            opacity: 0,
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+
+          done();
+        },
+        async enter(data) {
+          console.log('[Barba] enter work-detail');
+          const nextContainer = data.next.container;
+          const clone = data.clone;
+          const imageId = data.imageId;
+          
+          // Keep scroll locked during enter phase
+          
+          if (!clone || !imageId) {
+            gsap.set(nextContainer, { opacity: 1 });
+            // 🔓 UNLOCK SCROLL
+            unlockScroll();
+            return;
+          }
+          
+          gsap.set(nextContainer, { opacity: 0 });
+          let toImage = null;
+          for (let i = 0; i < 15; i++) {
+            await new Promise(r => setTimeout(r, 66));
+            toImage = data.next.container.querySelector(`img.is-work[data-image-id="${imageId}"]`);
+            if (toImage) break;
+          }
+
+          if (!toImage) {
+            clone.remove();
+            data.overlay?.remove();
+            gsap.set(nextContainer, { opacity: 1 });
+            // 🔓 UNLOCK SCROLL
+            unlockScroll();
+            return;
+          }
+          
+          // Wait for image to load to guarantee correct height
+          if (!toImage.complete) {
+            await new Promise((resolve) => {
+              toImage.addEventListener('load', resolve);
+              toImage.addEventListener('error', resolve);
+              setTimeout(resolve, 1500); // fallback timeout
+            });
+          }
+          
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          const rect = toImage.getBoundingClientRect();
+          
+          console.log('[Barba] Destination Image Rect:', rect);
+          console.log('[Barba] Clone Start Style:', clone.style.top, clone.style.left, clone.style.width, clone.style.height);
+
+          // Final sanity check, if it's somehow completely hidden just fallback
+          if (rect.height === 0 || rect.width === 0) {
+            console.log('[Barba] Fallback triggered! Height or Width is 0');
+            clone.remove();
+            data.overlay?.remove();
+            gsap.set(nextContainer, { opacity: 1 });
+            unlockScroll();
+            return;
+          }
+
+          await gsap.to(clone, {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            duration: 0.7,
+            ease: 'power2.inOut'
+          });
+
+          await gsap.to(nextContainer, {
+            opacity: 1,
+            duration: 0.4,
+            ease: 'power2.out'
+          });
+
           clone.remove();
           data.overlay?.remove();
-          gsap.set(nextContainer, { opacity: 1 });
-          unlockScroll();
-          return;
-        }
-        await gsap.to(clone, {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-          duration: 0.7,
-          ease: 'power2.inOut'
-        });
-        await gsap.to(nextContainer, {
-          opacity: 1,
-          duration: 0.4,
-          ease: 'power2.out'
-        });
-        clone.remove();
-        data.overlay?.remove();
-        // 🔓 UNLOCK SCROLL - Wait a bit to ensure everything is settled
-        setTimeout(() => {
-          unlockScroll();
-        }, 100);
-      }
-    }
-  ],
-  prevent: ({ el, current }) => {
-    const fromNamespace = current?.namespace;
-    // Only prevent if leaving from work-detail (your original logic)
-    if (fromNamespace === 'work-detail') {
-      console.log('[Barba] Prevented: Leaving work-detail, fallback to default browser');
-      return true;
-    }
-    // Let Barba handle links with data-image-id, prevent everything else
-    if (el && !el.hasAttribute('data-image-id')) {
-      return true;
-    }
-    return false;
-  }
-});
-// Safety cleanup hooks
-barba.hooks.afterEnter((data) => {
 
-    // FORCE NAVBAR THEME FOR NEW PAGE
-    const nextSection = data.next.container.querySelector('[data-theme]');
-    if (nextSection) {
-      const theme = nextSection.getAttribute('data-theme');
-      const navbar = document.querySelector('.navbar');
-      const triggerLine1 = document.querySelector('.nav_mobile-trigger_line1');
-      const triggerLine2 = document.querySelector('.nav_mobile-trigger_line2');
-      if (navbar) {
-        navbar.style.transition = 'background-color 0.3s, color 0.3s';
-        if (theme === 'light') {
-          navbar.style.backgroundColor = 'var(--background--light)';
-          navbar.style.color = 'var(--text-color--primary-dark)';
-          if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--dark)';
-          if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--dark)';
-        } else if (theme === 'dark') {
-          navbar.style.backgroundColor = 'var(--background--dark)';
-          navbar.style.color = 'var(--text-color--primary-light)';
-          if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--light)';
-          if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--light)';
-        } else if (theme === 'transparent') {
-          navbar.style.backgroundColor = 'transparent';
-          navbar.style.color = 'var(--text-color--primary-light)';
-          if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--light)';
-          if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--light)';
+          // 🔓 UNLOCK SCROLL - Wait a bit to ensure everything is settled
+          setTimeout(() => {
+            unlockScroll();
+          }, 100);
         }
       }
+    ],
+    prevent: ({ el, current }) => {
+      const fromNamespace = current?.namespace;
+      // Only prevent if leaving from work-detail (your original logic)
+      if (fromNamespace === 'work-detail') {
+        console.log('[Barba] Prevented: Leaving work-detail, fallback to default browser');
+        return true;
+      }
+      // Let Barba handle links with data-image-id, prevent everything else
+      if (el && !el.hasAttribute('data-image-id')) {
+        console.log('[Barba] Prevented: Not an image link, using default navigation');
+        return true;
+      }
+      return false;
     }
+  });
 
-  console.log('[Barba] afterEnter — Reinitializing global scripts');
-  // 🔓 Safety unlock
-  unlockScroll();
-  document.querySelectorAll('.barba-transition-overlay')?.forEach(el => el.remove());
-  document.querySelectorAll('.barba-container-transitioning')
-    .forEach(el => el.classList.remove('barba-container-transitioning'));
-  setTimeout(() => {
-    initNavbarTheme?.();
-    initMobileMenu?.();
-    initInternalLinks?.();
-    initDesktopServiceMenu?.();
-  }, 50);
-});
-// Emergency cleanup
-barba.hooks.after(() => {
-  console.log('[Barba] after — Emergency cleanup');
-  unlockScroll();
-});
-// Handle page load/refresh
-window.addEventListener('beforeunload', () => {
-  unlockScroll();
-});
-});
+  // Safety cleanup hooks
+  barba.hooks.afterEnter((data) => {
+
+      // FORCE NAVBAR THEME FOR NEW PAGE
+      const nextSection = data.next.container.querySelector('[data-theme]');
+      if (nextSection) {
+        const theme = nextSection.getAttribute('data-theme');
+        const navbar = document.querySelector('.navbar');
+        const triggerLine1 = document.querySelector('.nav_mobile-trigger_line1');
+        const triggerLine2 = document.querySelector('.nav_mobile-trigger_line2');
+        if (navbar) {
+          navbar.style.transition = 'background-color 0.3s, color 0.3s';
+          if (theme === 'light') {
+            navbar.style.backgroundColor = 'var(--background--light)';
+            navbar.style.color = 'var(--text-color--primary-dark)';
+            if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--dark)';
+            if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--dark)';
+          } else if (theme === 'dark') {
+            navbar.style.backgroundColor = 'var(--background--dark)';
+            navbar.style.color = 'var(--text-color--primary-light)';
+            if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--light)';
+            if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--light)';
+          } else if (theme === 'transparent') {
+            navbar.style.backgroundColor = 'transparent';
+            navbar.style.color = 'var(--text-color--primary-light)';
+            if(triggerLine1) triggerLine1.style.backgroundColor = 'var(--background--light)';
+            if(triggerLine2) triggerLine2.style.backgroundColor = 'var(--background--light)';
+          }
+        }
+      }
+
+    console.log('[Barba] afterEnter — Reinitializing global scripts');
+    // 🔓 Safety unlock
+    unlockScroll();
+    document.querySelectorAll('.barba-transition-overlay')?.forEach(el => el.remove());
+    document.querySelectorAll('.barba-container-transitioning')
+      .forEach(el => el.classList.remove('barba-container-transitioning'));
+
+    setTimeout(() => {
+      initNavbarTheme?.();
+      initMobileMenu?.();
+      initInternalLinks?.();
+      initDesktopServiceMenu?.();
+    }, 50);
+  });
+
+  // Emergency cleanup
+  barba.hooks.after(() => {
+    console.log('[Barba] after — Emergency cleanup');
+    unlockScroll();
+  });
+
+  // Handle page load/refresh
+  window.addEventListener('beforeunload', () => {
+    unlockScroll();
+  });
 </script>
         </div>
       </div>
@@ -1736,35 +1781,6 @@ window.addEventListener('beforeunload', () => {
                             </svg></div>
                         </div>
                       </div>
-                      <div class="h_services_card_graphic_right"><img src="/images/product-design-graphic-2.avif" loading="lazy" alt="" class="h_services_card_graphic_right_img">
-                        <div class="h_services_card_graphic_right_menu">
-                          <div class="h_services_card_graphic_right_menu_item w-embed"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewbox="0 0 28 29" fill="none">
-                              <g clip-path="url(#clip0_2486_368)">
-                                <path d="M24.4378 7.73664L14.3266 3.06997C14.2243 3.02259 14.1128 2.99805 14 2.99805C13.8872 2.99805 13.7757 3.02259 13.6733 3.06997L3.5622 7.73664C3.42719 7.79912 3.31293 7.89901 3.23298 8.02446C3.15302 8.14991 3.11072 8.29565 3.11109 8.44442V21.6666C3.11072 21.8154 3.15302 21.9611 3.23298 22.0866C3.31293 22.212 3.42719 22.3119 3.5622 22.3744L13.6733 27.0411C13.7757 27.0885 13.8872 27.113 14 27.113C14.1128 27.113 14.2243 27.0885 14.3266 27.0411L24.4378 22.3744C24.5728 22.3119 24.687 22.212 24.767 22.0866C24.8469 21.9611 24.8892 21.8154 24.8889 21.6666V8.44442C24.8892 8.29565 24.8469 8.14991 24.767 8.02446C24.687 7.89901 24.5728 7.79912 24.4378 7.73664ZM14 4.63331L22.2522 8.44442L14 12.2555L5.74775 8.44442L14 4.63331ZM4.66664 9.65775L13.2222 13.6089V25.12L4.66664 21.1689V9.65775ZM14.7778 25.12V13.6089L23.3333 9.65775V21.1689L14.7778 25.12Z" fill="currentColor"></path>
-                              </g>
-                              <defs>
-                                <clippath id="clip0_2486_368">
-                                  <rect width="28" height="28" fill="white" transform="translate(0 0.666504)"></rect>
-                                </clippath>
-                              </defs>
-                            </svg></div>
-                          <div class="h_services_card_graphic_right_menu_item w-embed"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewbox="0 0 28 28" fill="none">
-                              <path d="M4.66675 22.1667H23.3334M4.66675 17.5L9.33341 10.5L14.0001 12.8333L18.6667 7L23.3334 11.6667" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                            </svg></div>
-                          <div class="h_services_card_graphic_right_menu_item w-embed"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewbox="0 0 24 24" fill="none">
-                              <path d="M2 12.204C2 9.915 2 8.771 2.52 7.823C3.038 6.874 3.987 6.286 5.884 5.108L7.884 3.867C9.889 2.622 10.892 2 12 2C13.108 2 14.11 2.622 16.116 3.867L18.116 5.108C20.013 6.286 20.962 6.874 21.481 7.823C22 8.772 22 9.915 22 12.203V13.725C22 17.625 22 19.576 20.828 20.788C19.656 22 17.771 22 14 22H10C6.229 22 4.343 22 3.172 20.788C2.001 19.576 2 17.626 2 13.725V12.204Z" stroke="currentColor" stroke-width="1.5"></path>
-                              <path d="M12 15V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-                            </svg></div>
-                          <div class="h_services_card_graphic_right_menu_item w-embed"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewbox="0 0 28 28" fill="none">
-                              <path d="M7.00008 22.167V11.667C7.00008 9.81048 7.73758 8.03 9.05033 6.71724C10.3631 5.40449 12.1436 4.66699 14.0001 4.66699C15.8566 4.66699 17.6371 5.40449 18.9498 6.71724C20.2626 8.03 21.0001 9.81048 21.0001 11.667V22.167M7.00008 22.167H21.0001M7.00008 22.167H4.66675M21.0001 22.167H23.3334M12.8334 25.667H15.1667" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                              <path d="M14.0002 4.66683C14.6445 4.66683 15.1668 4.14449 15.1668 3.50016C15.1668 2.85583 14.6445 2.3335 14.0002 2.3335C13.3558 2.3335 12.8335 2.85583 12.8335 3.50016C12.8335 4.14449 13.3558 4.66683 14.0002 4.66683Z" stroke="currentColor" stroke-width="2"></path>
-                            </svg></div>
-                          <div class="h_services_card_graphic_right_menu_item w-embed"><svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewbox="0 0 28 28" fill="none">
-                              <path d="M10.6656 25.1829C8.73601 24.6066 6.98845 23.5407 5.59292 22.0889C6.0419 21.5564 6.32178 20.902 6.39675 20.2095C6.47172 19.517 6.33837 18.8179 6.01376 18.2017C5.68916 17.5854 5.18806 17.08 4.57459 16.7502C3.96112 16.4203 3.26319 16.281 2.57009 16.35C2.41184 15.5767 2.33249 14.7892 2.33326 13.9998C2.33326 12.7806 2.51992 11.6046 2.86759 10.4998H2.91659C3.51145 10.5 4.09654 10.3486 4.61662 10.0598C5.1367 9.77107 5.5746 9.35454 5.88898 8.84954C6.20336 8.34455 6.38385 7.76776 6.41339 7.17363C6.44294 6.57951 6.32057 5.98766 6.05784 5.45397C7.42595 4.18104 9.07982 3.25538 10.8803 2.75488C11.1733 3.33028 11.6198 3.8134 12.1704 4.15077C12.721 4.48814 13.3542 4.66663 13.9999 4.66647C14.6457 4.66663 15.2788 4.48814 15.8294 4.15077C16.38 3.8134 16.8265 3.33028 17.1196 2.75488C18.92 3.25538 20.5739 4.18104 21.942 5.45397C21.6774 5.9914 21.5551 6.58776 21.5869 7.18597C21.6187 7.78419 21.8035 8.36422 22.1236 8.87056C22.4438 9.37691 22.8885 9.7926 23.4153 10.0779C23.9421 10.3631 24.5333 10.5084 25.1323 10.4998C25.4874 11.6325 25.6676 12.8127 25.6666 13.9998C25.6666 14.8048 25.5849 15.5911 25.4298 16.3506C24.7367 16.2816 24.0387 16.4209 23.4253 16.7508C22.8118 17.0806 22.3107 17.586 21.9861 18.2023C21.6615 18.8185 21.5281 19.5176 21.6031 20.2101C21.6781 20.9026 21.9579 21.557 22.4069 22.0895C21.0113 23.5411 19.2638 24.6068 17.3343 25.1829C17.1077 24.4766 16.6627 23.8606 16.0634 23.4235C15.4642 22.9864 14.7416 22.7509 13.9999 22.7509C13.2582 22.7509 12.5357 22.9864 11.9364 23.4235C11.3372 23.8606 10.8922 24.4766 10.6656 25.1829Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
-                              <path d="M13.9998 18.0832C14.5361 18.0832 15.067 17.9776 15.5625 17.7723C16.0579 17.5671 16.508 17.2664 16.8872 16.8872C17.2664 16.508 17.5671 16.0579 17.7723 15.5625C17.9776 15.067 18.0832 14.5361 18.0832 13.9998C18.0832 13.4636 17.9776 12.9326 17.7723 12.4372C17.5671 11.9418 17.2664 11.4917 16.8872 11.1125C16.508 10.7333 16.0579 10.4325 15.5625 10.2273C15.067 10.0221 14.5361 9.9165 13.9998 9.9165C12.9169 9.9165 11.8783 10.3467 11.1125 11.1125C10.3467 11.8783 9.9165 12.9169 9.9165 13.9998C9.9165 15.0828 10.3467 16.1214 11.1125 16.8872C11.8783 17.653 12.9169 18.0832 13.9998 18.0832Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
-                            </svg></div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                   <div class="h_services_card_content">
@@ -1971,6 +1987,7 @@ window.addEventListener('beforeunload', () => {
         </div>
       </div>
     </main>
+  </div>
     
 <nav class="navbar">
         <div class="padding-global">
@@ -1984,7 +2001,7 @@ window.addEventListener('beforeunload', () => {
                     <path fill-rule="evenodd" clip-rule="evenodd" d="M104.864 24.2036C104.343 25.2565 104.083 26.4364 104.083 27.7431C104.083 29.0624 104.343 30.2486 104.864 31.3016C105.385 32.3419 106.134 33.1665 107.112 33.7754C108.09 34.3717 109.24 34.6698 110.561 34.6698C111.881 34.6698 113.025 34.3717 113.99 33.7754C114.968 33.1665 115.711 32.3419 116.219 31.3016C116.74 30.2486 117 29.0624 117 27.7431C117 26.4364 116.74 25.2565 116.219 24.2036C115.711 23.1506 114.968 22.326 113.99 21.7297C113.012 21.1335 111.869 20.8354 110.561 20.8354C109.24 20.8354 108.09 21.1335 107.112 21.7297C106.134 22.326 105.385 23.1506 104.864 24.2036ZM107.284 31.4919C106.534 30.5531 106.16 29.3035 106.16 27.7431C106.16 26.1826 106.534 24.9394 107.284 24.0133C108.033 23.0872 109.125 22.6241 110.561 22.6241C111.983 22.6241 113.069 23.0872 113.818 24.0133C114.568 24.9394 114.942 26.1826 114.942 27.7431C114.942 29.3162 114.568 30.5658 113.818 31.4919C113.082 32.418 111.996 32.881 110.561 32.881C109.125 32.881 108.033 32.418 107.284 31.4919Z" fill="currentColor"></path>
                     <path d="M102.805 22.7955V21.0448H94.7459V22.7955H97.7561V32.6909H94.7459V34.4606H102.805V32.6909H99.7946V22.7955H102.805Z" fill="currentColor"></path>
                     <path fill-rule="evenodd" clip-rule="evenodd" d="M82.4714 21.0448H86.9485C88.2567 21.0448 89.4125 21.2161 90.4158 21.5586C91.4319 21.9011 92.2638 22.5672 92.9115 23.5567C93.5593 24.5462 93.8832 25.9417 93.8832 27.7432C93.8832 29.5574 93.5593 30.9592 92.9115 31.9487C92.2638 32.9383 91.4319 33.6043 90.4158 33.9468C89.4125 34.2894 88.2567 34.4606 86.9485 34.4606H82.4714V21.0448ZM86.9485 32.6909C87.9391 32.6909 88.7711 32.5894 89.4442 32.3864C90.1301 32.1834 90.7016 31.7204 91.1588 30.9973C91.6161 30.2741 91.8447 29.1894 91.8447 27.7432C91.8447 26.3096 91.6161 25.2313 91.1588 24.5082C90.7016 23.7851 90.1301 23.322 89.4442 23.119C88.7584 22.9034 87.9264 22.7955 86.9485 22.7955H84.5099V32.6909H86.9485Z" fill="currentColor"></path>
-                    <path d="M70.9017 21.0448H68.8632V29.4749C68.8632 31.1749 69.3204 32.4689 70.2349 33.3569C71.1621 34.2323 72.5528 34.67 74.4072 34.67C76.2742 34.67 77.6713 34.2323 78.5985 33.3569C79.5256 32.4689 79.9892 31.1749 79.9892 29.4749V21.0448H77.9507V28.885C77.9507 29.7984 77.8428 30.5469 77.6268 31.1305C77.4236 31.714 77.0616 32.1581 76.5409 32.4625C76.0329 32.7543 75.3216 32.9002 74.4072 32.9002C73.4927 32.9002 72.7814 32.7543 72.2734 32.4625C71.7654 32.1581 71.4097 31.7204 71.2065 31.1495C71.0033 30.5659 70.9017 29.8111 70.9017 28.885V21.0448Z" fill="currentColor"></path>
+                    <path d="M70.9017 21.0448H68.8632V29.4749C68.8632 31.1749 69.3204 32.4689 70.2349 33.3569C71.1621 34.2323 72.5528 34.67 74.4072 34.67C76.2742 34.67 77.6713 34.2323 78.5985 33.3569C79.5256 32.4689 79.9892 31.1749 79.9892 29.4749H79.9892V21.0448H77.9507V28.885C77.9507 29.7984 77.8428 30.5469 77.6268 31.1305C77.4236 31.714 77.0616 32.1581 76.5409 32.4625C76.0329 32.7543 75.3216 32.9002 74.4072 32.9002C73.4927 32.9002 72.7814 32.7543 72.2734 32.4625C71.7654 32.1581 71.4097 31.7204 71.2065 31.1495C71.0033 30.5659 70.9017 29.8111 70.9017 28.885H70.9017V21.0448Z" fill="currentColor"></path>
                     <path d="M67.0921 21.0448V22.7955H62.5198V34.4606H60.4813V22.7955H55.909V21.0448H67.0921Z" fill="currentColor"></path>
                     <path d="M72.1935 7.47656V1.53935H70.155V14.9552H72.1935V9.24631H79.5473V14.9552H81.5858V1.53935H79.5473V7.47656H72.1935Z" fill="currentColor"></path>
                     <path d="M61.5931 15.1645C60.2722 15.1645 59.1164 14.8664 58.1257 14.2701C57.1478 13.6612 56.3984 12.8366 55.8777 11.7963C55.3569 10.7433 55.0966 9.55714 55.0966 8.23776C55.0966 6.93107 55.3569 5.75124 55.8777 4.69827C56.3984 3.6453 57.1478 2.82069 58.1257 2.22443C59.1164 1.62818 60.2722 1.33005 61.5931 1.33005C63.3585 1.33005 64.7874 1.81213 65.8796 2.77629C66.9846 3.72777 67.6387 5.0408 67.8419 6.7154H65.7844C65.632 5.57363 65.1938 4.69193 64.4698 4.0703C63.7459 3.43598 62.787 3.11882 61.5931 3.11882C60.1833 3.11882 59.091 3.58187 58.3162 4.50798C57.5542 5.42139 57.1732 6.66466 57.1732 8.23776C57.1732 9.81087 57.5542 11.0605 58.3162 11.9866C59.091 12.9127 60.1833 13.3757 61.5931 13.3757C62.787 13.3757 63.7459 13.0649 64.4698 12.4433C65.1938 11.809 65.632 10.9146 65.7844 9.76012H67.8419C67.6387 11.4474 66.9846 12.7731 65.8796 13.7373C64.7874 14.6888 63.3585 15.1645 61.5931 15.1645Z" fill="currentColor"></path>
@@ -2404,14 +2421,12 @@ window.addEventListener('beforeunload', () => {
       <div class="cw-cookie_script w-embed w-script">
         <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // ---- ELEMENTS ----
   const banner = document.getElementById('cw-cookie-banner');
   const options = document.getElementById('cw-cookie-options');
-  const cookieLink = document.getElementById('cookie-link'); // <— the trigger you wanted
+  const cookieLink = document.getElementById('cookie-link');
   const btnAcceptAll  = document.getElementById('cw-btn-accept-all');
   const btnAcceptSome = document.getElementById('cw-btn-accept-some');
   const btnRejectAll  = document.getElementById('cw-btn-reject-all');
-  // ---- HELPERS ----
   function showBanner() {
     if (!banner) return;
     banner.style.display = 'block';
@@ -2490,15 +2505,12 @@ document.addEventListener('DOMContentLoaded', function () {
     safeGtag()('consent', 'update', consentMode);
     localStorage.setItem('consentMode', JSON.stringify(consentMode));
   }
-  // ---- EVENT WIRING ----
-  // Show banner on manual click
   cookieLink?.addEventListener('click', function (e) {
     e.preventDefault();
     setConsentCheckboxes();
     hideOptions();
     showBanner();
   });
-  // Accept all
   btnAcceptAll?.addEventListener('click', function () {
     setConsent({
       necessary: true,
@@ -2511,7 +2523,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     hideBanner();
   });
-  // Accept some
   btnAcceptSome?.addEventListener('click', function () {
     setConsent({
       necessary: true,
@@ -2524,7 +2535,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     hideBanner();
   });
-  // Reject all
   btnRejectAll?.addEventListener('click', function () {
     setConsent({
       necessary: true,
@@ -2537,7 +2547,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     hideBanner();
   });
-  // Auto-show if no saved preference
   if (localStorage.getItem('consentMode') === null) {
     showBanner();
   }
@@ -2545,7 +2554,6 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
       </div>
     </div>
-  </div>
   
 <script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=67ec127269c9eeb8a38e34b1" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
   <script src="/js/webflow.js" type="text/javascript"></script>
@@ -2555,11 +2563,8 @@ document.addEventListener('DOMContentLoaded', function () {
   <script src="https://cdn.prod.website-files.com/gsap/3.15.0/SplitText.min.js" type="text/javascript"></script>
   <script type="text/javascript">gsap.registerPlugin(ScrollTrigger,Flip,SplitText);</script>
   <script src="https://unpkg.com/lenis@1.3.8/dist/lenis.min.js"></script>
-  <!--  Combined Lenis and Mobile Menu Script  -->
   <script>
-// Initialize Lenis and store it in the window object to make it globally accessible
 document.addEventListener("DOMContentLoaded", () => {
-    // Your init code goes here
     const lenis = new Lenis();
     function raf(time) {
       lenis.raf(time);
@@ -2567,7 +2572,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     requestAnimationFrame(raf);
 });
-//NAV MENU TRIGGER
 document.addEventListener("DOMContentLoaded", function () {
   const trigger = document.getElementById("nav-mobile-trigger");
   const navMenu = document.getElementById("nav-mobile-menu");
@@ -2590,14 +2594,12 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
   }
-  // Trigger click: toggle menu open/close
   trigger.addEventListener("click", function (e) {
     e.preventDefault();
     e.stopPropagation();
     const isOpen = navMenu.classList.contains("active");
     toggleMenu(!isOpen);
   });
-  // Close menu when clicking outside of it
   document.addEventListener("click", function (e) {
     const clickedInsideMenu = e.target.closest("#nav-mobile-menu");
     if (!clickedInsideMenu && navMenu.classList.contains("active")) {
@@ -2606,74 +2608,13 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 </script>
-  <!--  DYNAMIC NAVBAR THEME  -->
   <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const navbar = document.querySelector('.navbar');
-  const triggerLine1 = document.querySelector('.nav_mobile-trigger_line1');
-  const triggerLine2 = document.querySelector('.nav_mobile-trigger_line2');
-  let currentTheme = null;
-  const OFFSET = 40; // 40px offset from top
-  // Function to find which section is at the top with offset
-  function getSectionAtTop() {
-    const themeSections = document.querySelectorAll('[data-theme]');
-    for (const section of themeSections) {
-      const rect = section.getBoundingClientRect();
-      if (rect.top <= OFFSET && rect.bottom > OFFSET) {
-        return section;
-      }
-    }
-    for (const section of themeSections) {
-      const rect = section.getBoundingClientRect();
-      if (rect.top < window.innerHeight && rect.bottom > 0) {
-        return section;
-      }
-    }
-    return null;
+  if (typeof window.updateNavbarTheme === 'function') {
+    window.updateNavbarTheme();
   }
-  // Function to update navbar theme
-  function updateNavbarTheme() {
-    const topSection = getSectionAtTop();
-    if (topSection) {
-      const theme = topSection.getAttribute('data-theme');
-      if (theme !== currentTheme) {
-        currentTheme = theme;
-        navbar.style.transition = 'background-color 0.3s, color 0.3s';
-        if (theme === 'light') {
-          navbar.style.backgroundColor = 'var(--background--light)';
-          navbar.style.color = 'var(--text-color--primary-dark)';
-          triggerLine1.style.backgroundColor = 'var(--background--dark)';
-          triggerLine2.style.backgroundColor = 'var(--background--dark)';
-        } else if (theme === 'dark') {
-          navbar.style.backgroundColor = 'var(--background--dark)';
-          navbar.style.color = 'var(--text-color--primary-light)';
-          triggerLine1.style.backgroundColor = 'var(--background--light)';
-          triggerLine2.style.backgroundColor = 'var(--background--light)';
-        } else if (theme === 'transparent') {
-          navbar.style.backgroundColor = 'transparent';
-          navbar.style.color = 'var(--text-color--primary-light)';
-          triggerLine1.style.backgroundColor = 'var(--background--light)';
-          triggerLine2.style.backgroundColor = 'var(--background--light)';
-        }
-      }
-    }
-  }
-  // Initial update
-  updateNavbarTheme();
-  // Throttled scroll event
-  let ticking = false;
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      window.requestAnimationFrame(() => {
-        updateNavbarTheme();
-        ticking = false;
-      });
-      ticking = true;
-    }
-  });
 });
 </script>
-  <!--  DESKTOP SERVICE MENU  -->
   <script>
 document.addEventListener('DOMContentLoaded', () => {
   if (window.innerWidth >= 992) {
