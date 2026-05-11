@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+
 import type { APIRoute } from 'astro';
 
 // This explicitly marks this file to be Server-Side Rendered (not statically generated)
