@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:cloudflare": "astro build && node build-cloudflare.mjs",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist/client --project-name ech0-website --branch=main",
     "preview": "astro preview",
     "astro": "astro"
   },
