@@ -45,7 +45,7 @@ export const POST: APIRoute = async ({ request }) => {
     const { data: resendData, error } = await resend.emails.send({
       from: 'ECH0 STUDIO <no-reply@ech0.work>',
       to: ['hello@ech0.work'],
-      reply_to: email,
+      replyTo: email as string,
       subject: `New Lead: ${firstName} ${lastName}`,
       html: htmlBody,
     });
