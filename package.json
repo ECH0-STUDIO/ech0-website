@@ -12,8 +12,18 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^10.1.0",
+    "@astrojs/react": "^5.0.4",
     "@sanity/client": "^7.21.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "astro": "^6.1.8",
-    "csv-parse": "^6.2.1"
+    "cheerio": "^1.2.0",
+    "csv-parse": "^6.2.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "resend": "^6.12.3"
   }
 }

@@ -1419,5 +1419,50 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   });
 </script>
+
+<script>
+  // Handle Contact Form Submission via AJAX to prevent redirect
+  document.addEventListener("DOMContentLoaded", () => {
+    document.body.addEventListener("submit", async (e) => {
+      const form = e.target.closest("#wf-form-Say-hello-form");
+      if (!form) return;
+      
+      e.preventDefault();
+      
+      const submitBtn = form.querySelector('input[type="submit"]');
+      const originalText = submitBtn.value;
+      const waitText = submitBtn.getAttribute("data-wait") || "Please wait...";
+      
+      submitBtn.value = waitText;
+      submitBtn.disabled = true;
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData
+        });
+        
+        if (response.ok) {
+          // Hide form, show success block
+          form.style.display = "none";
+          const doneBlock = form.parentElement.querySelector(".w-form-done");
+          if (doneBlock) doneBlock.style.display = "block";
+        } else {
+          // Show fail block
+          const failBlock = form.parentElement.querySelector(".w-form-fail");
+          if (failBlock) failBlock.style.display = "block";
+        }
+      } catch (err) {
+        const failBlock = form.parentElement.querySelector(".w-form-fail");
+        if (failBlock) failBlock.style.display = "block";
+      } finally {
+        submitBtn.value = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+  });
+</script>
+
 </body>
 </html>
